@@ -3,7 +3,7 @@ package com.example.hackcmuapp
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Base64 // Correct Base64 import
+import android.util.Base64
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
                 var showCameraPreview by remember { mutableStateOf(true) }
                 var showLeaderboard by remember { mutableStateOf(false) }
                 var capturedPhotoFile by remember { mutableStateOf<File?>(null) }
+                var selectedButton by remember { mutableStateOf("camera") } // State to track selected icon
 
                 Scaffold(
                     bottomBar = {
@@ -76,10 +77,20 @@ class MainActivity : ComponentActivity() {
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     // Left Button with Leaderboard Icon
-                                    IconButton(onClick = {
-                                        showLeaderboard = true
-                                        showCameraPreview = false
-                                    }) {
+                                    IconButton(
+                                        onClick = {
+                                            showLeaderboard = true
+                                            showCameraPreview = false
+                                            selectedButton = "leaderboard"
+                                        },
+                                        modifier = Modifier
+                                            .size(60.dp)
+                                            .background(
+                                                if (selectedButton == "leaderboard") Color.Black else Color.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .padding(8.dp)
+                                    ) {
                                         Image(
                                             painter = painterResource(id = R.drawable.leaderboard),
                                             contentDescription = "Leaderboard Icon",
@@ -94,12 +105,15 @@ class MainActivity : ComponentActivity() {
                                             showCameraPreview = true
                                             showLeaderboard = false
                                             takeAndUploadPhoto()
+                                            selectedButton = "camera"
                                         },
                                         modifier = Modifier
-                                            .clip(CircleShape)
                                             .size(60.dp)
+                                            .background(
+                                                if (selectedButton == "camera") Color.Black else Color.Transparent,
+                                                shape = CircleShape
+                                            )
                                             .padding(8.dp)
-                                            .background(MaterialTheme.colorScheme.primary)
                                     ) {
                                         Image(
                                             painter = painterResource(id = R.drawable.camera),
@@ -110,10 +124,20 @@ class MainActivity : ComponentActivity() {
                                     }
 
                                     // Right Button with Dog Icon
-                                    IconButton(onClick = {
-                                        showLeaderboard = false
-                                        showCameraPreview = false
-                                    }) {
+                                    IconButton(
+                                        onClick = {
+                                            showLeaderboard = false
+                                            showCameraPreview = false
+                                            selectedButton = "dog"
+                                        },
+                                        modifier = Modifier
+                                            .size(60.dp)
+                                            .background(
+                                                if (selectedButton == "dog") Color.Black else Color.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .padding(8.dp)
+                                    ) {
                                         Image(
                                             painter = painterResource(id = R.drawable.dog),
                                             contentDescription = "Dog Icon",
@@ -197,7 +221,8 @@ class MainActivity : ComponentActivity() {
         val inputStream = FileInputStream(photoFile)
         val bytes = inputStream.readBytes()
         inputStream.close()
-        return Base64.encodeToString(bytes, Base64.DEFAULT)
+//        return Base64.UrlSafe.encode(bytes)
+        return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP)
     }
 
     private fun uploadPhoto(base64Image: String, callback: (Boolean) -> Unit) {
