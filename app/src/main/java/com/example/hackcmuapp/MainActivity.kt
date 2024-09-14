@@ -91,6 +91,7 @@ class MainActivity : ComponentActivity() {
                                         onClick = {
                                             showCameraPreview = true
                                             showLeaderboard = false
+                                            takeAndUploadPhoto()
                                         },
                                         modifier = Modifier
                                             .clip(CircleShape)
@@ -157,7 +158,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun takePhoto(onPhotoCaptured: (File) -> Unit) {
+    private fun takeAndUploadPhoto() {
         val photoFile = File(
             outputDirectory,
             "${System.currentTimeMillis()}.jpg"
@@ -174,14 +175,23 @@ class MainActivity : ComponentActivity() {
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     Log.d(TAG, "Photo capture succeeded: ${photoFile.absolutePath}")
-                    onPhotoCaptured(photoFile)
+                    uploadPhoto(photoFile) { success ->
+                        runOnUiThread {
+                            Toast.makeText(
+                                this@MainActivity,
+                                if (success) "Photo uploaded successfully!" else "Upload failed.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
                 }
             }
         )
     }
 
     private fun uploadPhoto(photoFile: File, callback: (Boolean) -> Unit) {
-        val url = "https://your-server.com/upload"
+        // Replace with the desired URL for the post request
+        val url = "https://www.postb.in/1726289277272-7961796934250?hello=world"
 
         val requestBody = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
@@ -262,15 +272,6 @@ class MainActivity : ComponentActivity() {
 
             previewView
         }, modifier = Modifier.fillMaxSize())
-
-        // Capture photo on button click
-        Button(onClick = {
-            takePhoto { photoFile ->
-                onPhotoCaptured(photoFile)
-            }
-        }) {
-            Text(text = "Take Photo")
-        }
     }
 
     @Composable
