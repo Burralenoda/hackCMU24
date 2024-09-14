@@ -1,7 +1,9 @@
 package com.example.hackcmuapp
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.location.Location
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
@@ -30,6 +32,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import coil.compose.rememberImagePainter
 import com.example.hackcmuapp.ui.theme.HackCMUAppTheme
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.tasks.Task
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import java.io.File
@@ -42,15 +47,19 @@ class MainActivity : ComponentActivity() {
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var outputDirectory: File
     private lateinit var imageCapture: ImageCapture
+    private lateinit var fusedLocationClient: FusedLocationProviderClient // Location client
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         cameraExecutor = Executors.newSingleThreadExecutor()
 
+        // Initialize the fused location client
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
         // Set up the output directory
         outputDirectory = getOutputDirectory()
 
-        // Check for camera permissions
+        // Check for camera and location permissions
         if (allPermissionsGranted()) {
             // Start the camera when the app loads
         } else {
@@ -64,7 +73,7 @@ class MainActivity : ComponentActivity() {
                 var showCameraPreview by remember { mutableStateOf(true) }
                 var showLeaderboard by remember { mutableStateOf(false) }
                 var capturedPhotoFile by remember { mutableStateOf<File?>(null) }
-                var selectedButton by remember { mutableStateOf("camera") } // State to track selected icon
+                var selectedButton by remember { mutableStateOf("camera") }
 
                 Scaffold(
                     bottomBar = {
@@ -104,7 +113,7 @@ class MainActivity : ComponentActivity() {
                                         onClick = {
                                             showCameraPreview = true
                                             showLeaderboard = false
-                                            takeAndUploadPhoto()
+                                            takeAndUploadPhotoWithLocation() // Updated function
                                             selectedButton = "camera"
                                         },
                                         modifier = Modifier
@@ -184,7 +193,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun takeAndUploadPhoto() {
+    @SuppressLint("MissingPermission")
+    private fun takeAndUploadPhotoWithLocation() {
         val photoFile = File(
             outputDirectory,
             "${System.currentTimeMillis()}.jpg"
@@ -201,13 +211,28 @@ class MainActivity : ComponentActivity() {
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     Log.d(TAG, "Photo capture succeeded: ${photoFile.absolutePath}")
-                    val base64Image = encodeImageToBase64(photoFile)
+                    getCurrentLocation { location ->
+                        if (location != null) {
+                            val base64Image = encodeImageToBase64(photoFile)
 
-                    uploadPhoto(base64Image) { success ->
-                        runOnUiThread {
+                            uploadPhotoWithLocation(
+                                base64Image,
+                                location.latitude,
+                                location.longitude
+                            ) { success ->
+                                runOnUiThread {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        if (success) "Photo and location uploaded successfully!"
+                                        else "Upload failed.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        } else {
                             Toast.makeText(
                                 this@MainActivity,
-                                if (success) "Photo uploaded successfully!" else "Upload failed.",
+                                "Failed to get location",
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -217,21 +242,35 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    @SuppressLint("MissingPermission")
+    private fun getCurrentLocation(onLocationRetrieved: (Location?) -> Unit) {
+        val locationTask: Task<Location> = fusedLocationClient.lastLocation
+        locationTask.addOnSuccessListener { location: Location? ->
+            onLocationRetrieved(location)
+        }
+    }
+
     private fun encodeImageToBase64(photoFile: File): String {
         val inputStream = FileInputStream(photoFile)
         val bytes = inputStream.readBytes()
         inputStream.close()
-//        return Base64.UrlSafe.encode(bytes)
         return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP)
     }
 
-    private fun uploadPhoto(base64Image: String, callback: (Boolean) -> Unit) {
+    private fun uploadPhotoWithLocation(
+        base64Image: String,
+        latitude: Double,
+        longitude: Double,
+        callback: (Boolean) -> Unit
+    ) {
         val url = "https://f187-128-237-82-8.ngrok-free.app/upload"
 
-        // Create JSON body for the POST request
+        // Create JSON body with the Base64 image and location data
         val jsonBody = """
             {
-                "image": "$base64Image"
+                "image": "$base64Image",
+                "latitude": $latitude,
+                "longitude": $longitude
             }
         """.trimIndent()
 
@@ -328,6 +367,10 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "CameraXApp"
         private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+        private val REQUIRED_PERMISSIONS = arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
     }
 }

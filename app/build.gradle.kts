@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.generativeai)
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
     implementation("io.coil-kt:coil-compose:2.1.0")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 
 
     // CameraX dependencies
