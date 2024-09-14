@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var outputDirectory: File
     private lateinit var imageCapture: ImageCapture
-    private lateinit var fusedLocationClient: FusedLocationProviderClient // Location client
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
                 var showCameraPreview by remember { mutableStateOf(true) }
                 var showLeaderboard by remember { mutableStateOf(false) }
                 var capturedPhotoFile by remember { mutableStateOf<File?>(null) }
+                var showMoney by remember { mutableStateOf(false) }
                 var selectedButton by remember { mutableStateOf("camera") }
 
                 Scaffold(
@@ -90,6 +91,7 @@ class MainActivity : ComponentActivity() {
                                         onClick = {
                                             showLeaderboard = true
                                             showCameraPreview = false
+                                            showMoney = false
                                             selectedButton = "leaderboard"
                                         },
                                         modifier = Modifier
@@ -113,6 +115,7 @@ class MainActivity : ComponentActivity() {
                                         onClick = {
                                             showCameraPreview = true
                                             showLeaderboard = false
+                                            showMoney = false
                                             takeAndUploadPhotoWithLocation() // Updated function
                                             selectedButton = "camera"
                                         },
@@ -137,6 +140,7 @@ class MainActivity : ComponentActivity() {
                                         onClick = {
                                             showLeaderboard = false
                                             showCameraPreview = false
+                                            showMoney = false
                                             selectedButton = "dog"
                                         },
                                         modifier = Modifier
@@ -150,6 +154,30 @@ class MainActivity : ComponentActivity() {
                                         Image(
                                             painter = painterResource(id = R.drawable.dog),
                                             contentDescription = "Dog Icon",
+                                            modifier = Modifier.size(40.dp),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    }
+
+                                    // New Right Button with Dollar Icon
+                                    IconButton(
+                                        onClick = {
+                                            showMoney = true
+                                            showLeaderboard = false
+                                            showCameraPreview = false
+                                            selectedButton = "money"
+                                        },
+                                        modifier = Modifier
+                                            .size(60.dp)
+                                            .background(
+                                                if (selectedButton == "money") Color.Black else Color.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .padding(8.dp)
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = R.drawable.dollar),
+                                            contentDescription = "Dollar Icon",
                                             modifier = Modifier.size(40.dp),
                                             contentScale = ContentScale.Fit
                                         )
@@ -170,6 +198,14 @@ class MainActivity : ComponentActivity() {
                             showCameraPreview -> CameraPreviewView(onPhotoCaptured = { photoFile ->
                                 capturedPhotoFile = photoFile
                             })
+                            showMoney -> {
+                                // Show "MONEY" when the dollar icon is clicked
+                                Text(
+                                    text = "MONEY",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = Color.Black
+                                )
+                            }
                             else -> {
                                 // Show captured photo or a default image if none was captured
                                 capturedPhotoFile?.let {
