@@ -52,6 +52,8 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.generativeai)
+    implementation("com.squareup.okhttp3:okhttp:4.9.3")
+
 
     // CameraX dependencies
     implementation("androidx.camera:camera-camera2:1.2.2")

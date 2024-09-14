@@ -1,16 +1,18 @@
 package com.example.hackcmuapp
 
-import android.util.Log
-
-
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.camera.core.*
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,40 +20,46 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.hackcmuapp.ui.theme.HackCMUAppTheme
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import java.io.File
+import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
     private lateinit var cameraExecutor: ExecutorService
+    private lateinit var outputDirectory: File
+    private lateinit var imageCapture: ImageCapture
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        cameraExecutor = Executors.newSingleThreadExecutor() // Executor for camera tasks
+        cameraExecutor = Executors.newSingleThreadExecutor()
+
+        // Set up the output directory
+        outputDirectory = getOutputDirectory()
+
+        // Check for camera permissions
+        if (allPermissionsGranted()) {
+            // Start the camera when the app loads
+        } else {
+            ActivityCompat.requestPermissions(
+                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
+            )
+        }
+
         setContent {
             HackCMUAppTheme {
-                var showLeaderboard by remember { mutableStateOf(false) }
-                var showCamera by remember { mutableStateOf(false) }
-
-                // List of random names for the leaderboard
-                val randomNames = listOf(
-                    "John Doe", "Jane Smith", "Michael Johnson", "Emily Davis",
-                    "Chris Brown", "Jessica Wilson", "David Lee", "Sarah Miller",
-                    "Daniel Garcia", "Sophia Martinez"
-                )
+                var showUploadButton by remember { mutableStateOf(false) }
+                var capturedPhotoFile by remember { mutableStateOf<File?>(null) }
 
                 Scaffold(
                     bottomBar = {
@@ -63,38 +71,16 @@ class MainActivity : ComponentActivity() {
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Left Button with Leaderboard Icon
-                                    IconButton(onClick = { showLeaderboard = true; showCamera = false }) {
-                                        Image(
-                                            painter = painterResource(id = R.drawable.leaderboard),
-                                            contentDescription = "Leaderboard Icon",
-                                            modifier = Modifier.size(40.dp),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                    }
-
-                                    // Circular Button with Camera Icon in the center
-                                    IconButton(
-                                        onClick = { showCamera = true; showLeaderboard = false },
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .size(60.dp)
-                                            .padding(8.dp)
-                                            .background(MaterialTheme.colorScheme.primary)
-                                    ) {
+                                    // Camera Icon Button
+                                    IconButton(onClick = {
+                                        takePhoto { photoFile ->
+                                            capturedPhotoFile = photoFile
+                                            showUploadButton = true
+                                        }
+                                    }) {
                                         Image(
                                             painter = painterResource(id = R.drawable.camera),
                                             contentDescription = "Camera Icon",
-                                            modifier = Modifier.size(40.dp),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                    }
-
-                                    // Right Button with Dog Icon
-                                    IconButton(onClick = { /* Your Dog Action */ }) {
-                                        Image(
-                                            painter = painterResource(id = R.drawable.dog),
-                                            contentDescription = "Dog Icon",
                                             modifier = Modifier.size(40.dp),
                                             contentScale = ContentScale.Fit
                                         )
@@ -107,25 +93,25 @@ class MainActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(paddingValues)
+                            .padding(paddingValues),
+                        contentAlignment = Alignment.Center
                     ) {
-                        when {
-                            showCamera -> {
-                                CameraPreviewView()
-                            }
-                            showLeaderboard -> {
-                                LeaderboardView(randomNames)
-                            }
-                            else -> {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text(text = "Welcome Screen", style = MaterialTheme.typography.headlineMedium)
+                        CameraPreviewView()
+
+                        // Show Upload button after photo is taken
+                        if (showUploadButton) {
+                            Button(onClick = {
+                                capturedPhotoFile?.let { file ->
+                                    uploadPhoto(file) { success ->
+                                        Toast.makeText(
+                                            applicationContext,
+                                            if (success) "Upload successful!" else "Upload failed.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
+                            }) {
+                                Text(text = "Upload Photo")
                             }
                         }
                     }
@@ -134,29 +120,92 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        cameraExecutor.shutdown()
+    private fun takePhoto(onPhotoCaptured: (File) -> Unit) {
+        val photoFile = File(
+            outputDirectory,
+            "${System.currentTimeMillis()}.jpg"
+        )
+
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+        imageCapture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exc: ImageCaptureException) {
+                    Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+                }
+
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    Log.d(TAG, "Photo capture succeeded: ${photoFile.absolutePath}")
+                    onPhotoCaptured(photoFile)
+                }
+            }
+        )
     }
-}
 
-@Composable
-fun CameraPreviewView() {
-    val context = LocalContext.current
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+    private fun uploadPhoto(photoFile: File, callback: (Boolean) -> Unit) {
+        val url = "https://your-server.com/upload"
 
-    AndroidView(
-        factory = { previewViewContext ->
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "file", photoFile.name,
+                RequestBody.create("image/jpeg".toMediaTypeOrNull(), photoFile)  // Using toMediaTypeOrNull
+            )
+            .build()
+
+        val request = Request.Builder()
+            .url(url)
+            .post(requestBody)
+            .build()
+
+        val client = OkHttpClient()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                Log.e(TAG, "Upload failed", e)
+                callback(false)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                if (response.isSuccessful) {
+                    Log.d(TAG, "Upload successful")
+                    callback(true)
+                } else {
+                    Log.e(TAG, "Upload failed with code: ${response.code}")  // Using response.code
+                    callback(false)
+                }
+            }
+        })
+    }
+
+    private fun getOutputDirectory(): File {
+        val mediaDir = externalMediaDirs.firstOrNull()?.let {
+            File(it, resources.getString(R.string.app_name)).apply { mkdirs() }
+        }
+        return if (mediaDir != null && mediaDir.exists()) mediaDir else filesDir
+    }
+
+    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
+    }
+
+    @Composable
+    fun CameraPreviewView() {
+        val context = LocalContext.current
+        val lifecycleOwner = LocalLifecycleOwner.current
+        val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+
+        AndroidView(factory = { previewViewContext ->
             val previewView = androidx.camera.view.PreviewView(previewViewContext)
-
             val cameraProvider = cameraProviderFuture.get()
 
-            // Set up Preview
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
 
-            // Select back camera as a default
+            imageCapture = ImageCapture.Builder().build()
+
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
@@ -165,62 +214,22 @@ fun CameraPreviewView() {
 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
-                    context as ComponentActivity,
+                    lifecycleOwner,  // Pass the lifecycle owner
                     cameraSelector,
-                    preview
+                    preview,
+                    imageCapture
                 )
-
             } catch (exc: Exception) {
-                Log.e("CameraPreview", "Use case binding failed", exc)
+                Log.e(TAG, "Use case binding failed", exc)
             }
 
             previewView
-        },
-        modifier = Modifier.fillMaxSize()
-    )
-}
-
-@Composable
-fun LeaderboardView(names: List<String>) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Leaderboard",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // LazyColumn to display random names
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(names) { name ->
-                LeaderboardItem(name)
-            }
-        }
+        }, modifier = Modifier.fillMaxSize())
     }
-}
 
-@Composable
-fun LeaderboardItem(name: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-            .padding(16.dp)
-    ) {
-        Text(
-            text = name,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color.Black
-        )
+    companion object {
+        private const val TAG = "CameraXApp"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
     }
 }
