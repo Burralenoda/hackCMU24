@@ -1,5 +1,7 @@
 package com.example.hackcmuapp
 
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
@@ -12,8 +14,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -26,7 +27,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -198,14 +201,7 @@ class MainActivity : ComponentActivity() {
                             showCameraPreview -> CameraPreviewView(onPhotoCaptured = { photoFile ->
                                 capturedPhotoFile = photoFile
                             })
-                            showMoney -> {
-                                // Show "MONEY" when the dollar icon is clicked
-                                Text(
-                                    text = "MONEY",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = Color.Black
-                                )
-                            }
+                            showMoney -> MoneyView()  // Updated section to display "Monthly Revenue"
                             selectedButton == "dog" -> ProfileView() // Display the profile view when dog icon is clicked
                             else -> {
                                 capturedPhotoFile?.let {
@@ -226,6 +222,59 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    // Function to check if all permissions are granted
+    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(
+            baseContext, it
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun getOutputDirectory(): File {
+        val mediaDir = externalMediaDirs.firstOrNull()?.let {
+            File(it, resources.getString(R.string.app_name)).apply { mkdirs() }
+        }
+        return if (mediaDir != null && mediaDir.exists()) mediaDir else filesDir
+    }
+
+    companion object {
+        private const val TAG = "MainActivity" // TAG for logging purposes
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS = arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+    }
+
+    // New composable for the "Monthly Revenue" section
+    @Composable
+    fun MoneyView() {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Monthly Revenue",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = "$50",
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontSize = 80.sp,
+                    color = Color(0xFF00C853),  // Green color
+                    fontWeight = FontWeight.Bold
+                )
+            )
         }
     }
 
@@ -337,17 +386,6 @@ class MainActivity : ComponentActivity() {
         })
     }
 
-    private fun getOutputDirectory(): File {
-        val mediaDir = externalMediaDirs.firstOrNull()?.let {
-            File(it, resources.getString(R.string.app_name)).apply { mkdirs() }
-        }
-        return if (mediaDir != null && mediaDir.exists()) mediaDir else filesDir
-    }
-
-    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
-        ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
-    }
-
     @Composable
     fun CameraPreviewView(onPhotoCaptured: (File) -> Unit) {
         val context = LocalContext.current
@@ -393,10 +431,93 @@ class MainActivity : ComponentActivity() {
                 .fillMaxSize()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
             Text(text = "Leaderboard", style = MaterialTheme.typography.headlineMedium)
-            // You can add actual leaderboard content here
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Example leaderboard
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                items(5) { index ->
+                    LeaderboardItem(rank = index + 1, name = "User $index", score = 100 * (5 - index))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Example graphs
+            Text(text = "User Timeline", style = MaterialTheme.typography.bodyLarge)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            InteractiveGraph(
+                modifier = Modifier.height(150.dp).fillMaxWidth(),
+                yValues = (1..5).map { "User $it" },
+                xValues = (1..5).map { it * 10 }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(text = "Likes vs Time", style = MaterialTheme.typography.bodyLarge)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LikesVsTimeGraph(
+                modifier = Modifier.height(150.dp).fillMaxWidth(),
+                xValues = (1..5).map { it * 10 },
+                yValues = (1..5).map { it * 20 }
+            )
+        }
+    }
+
+    @Composable
+    fun LeaderboardItem(rank: Int, name: String, score: Int) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = "$rank.", style = MaterialTheme.typography.bodyLarge)
+            Text(text = name, style = MaterialTheme.typography.bodyLarge)
+            Text(text = "$score points", style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+
+    @Composable
+    fun InteractiveGraph(
+        modifier: Modifier,
+        yValues: List<String>,
+        xValues: List<Int>
+    ) {
+        // Example graph logic
+        // You can create a custom graph with Canvas API or use a Jetpack Compose chart library
+        Box(
+            modifier = modifier
+                .background(Color.LightGray)
+                .padding(16.dp)
+        ) {
+            Text(text = "Graph Placeholder - Time vs Users", style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+
+    @Composable
+    fun LikesVsTimeGraph(
+        modifier: Modifier,
+        xValues: List<Int>,
+        yValues: List<Int>
+    ) {
+        // Example graph logic for Likes vs Time
+        Box(
+            modifier = modifier
+                .background(Color.LightGray)
+                .padding(16.dp)
+        ) {
+            Text(text = "Graph Placeholder - Likes vs Time", style = MaterialTheme.typography.bodyLarge)
         }
     }
 
@@ -436,15 +557,5 @@ class MainActivity : ComponentActivity() {
                 color = Color.Gray
             )
         }
-    }
-
-    companion object {
-        private const val TAG = "CameraXApp"
-        private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = arrayOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
     }
 }
