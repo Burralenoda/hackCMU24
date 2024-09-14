@@ -1,17 +1,16 @@
 package com.example.hackcmuapp
 
-import android.os.Bundle
 import android.util.Log
+
+
+import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,10 +18,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.example.hackcmuapp.ui.theme.HackCMUAppTheme
 import java.util.concurrent.ExecutorService
@@ -36,11 +43,16 @@ class MainActivity : ComponentActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor() // Executor for camera tasks
         setContent {
             HackCMUAppTheme {
-                // State to control which screen is shown, set to true by default to show bg.png
-                var showLeaderboard by remember { mutableStateOf(true) }
+                var showLeaderboard by remember { mutableStateOf(false) }
                 var showCamera by remember { mutableStateOf(false) }
 
-                // Scaffold to hold the bottom bar and content
+                // List of random names for the leaderboard
+                val randomNames = listOf(
+                    "John Doe", "Jane Smith", "Michael Johnson", "Emily Davis",
+                    "Chris Brown", "Jessica Wilson", "David Lee", "Sarah Miller",
+                    "Daniel Garcia", "Sophia Martinez"
+                )
+
                 Scaffold(
                     bottomBar = {
                         BottomAppBar(
@@ -54,7 +66,7 @@ class MainActivity : ComponentActivity() {
                                     // Left Button with Leaderboard Icon
                                     IconButton(onClick = { showLeaderboard = true; showCamera = false }) {
                                         Image(
-                                            painter = painterResource(id = R.drawable.leaderboard), // Using leaderboard.png
+                                            painter = painterResource(id = R.drawable.leaderboard),
                                             contentDescription = "Leaderboard Icon",
                                             modifier = Modifier.size(40.dp),
                                             contentScale = ContentScale.Fit
@@ -71,7 +83,7 @@ class MainActivity : ComponentActivity() {
                                             .background(MaterialTheme.colorScheme.primary)
                                     ) {
                                         Image(
-                                            painter = painterResource(id = R.drawable.camera), // Using camera.png
+                                            painter = painterResource(id = R.drawable.camera),
                                             contentDescription = "Camera Icon",
                                             modifier = Modifier.size(40.dp),
                                             contentScale = ContentScale.Fit
@@ -81,7 +93,7 @@ class MainActivity : ComponentActivity() {
                                     // Right Button with Dog Icon
                                     IconButton(onClick = { /* Your Dog Action */ }) {
                                         Image(
-                                            painter = painterResource(id = R.drawable.dog), // Using dog.png
+                                            painter = painterResource(id = R.drawable.dog),
                                             contentDescription = "Dog Icon",
                                             modifier = Modifier.size(40.dp),
                                             contentScale = ContentScale.Fit
@@ -92,33 +104,28 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 ) { paddingValues ->
-                    // Box that holds the main content and respects padding from Scaffold
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(paddingValues)
                     ) {
-                        if (showCamera) {
-                            // Display in-app camera preview
-                            CameraPreviewView()
-                        } else if (showLeaderboard) {
-                            // Show background image by default
-                            Image(
-                                painter = painterResource(id = R.drawable.bg), // Using bg.png
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            // Default screen content (if toggled back)
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Text(text = "Welcome Screen", style = MaterialTheme.typography.headlineMedium)
+                        when {
+                            showCamera -> {
+                                CameraPreviewView()
+                            }
+                            showLeaderboard -> {
+                                LeaderboardView(randomNames)
+                            }
+                            else -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(text = "Welcome Screen", style = MaterialTheme.typography.headlineMedium)
+                                }
                             }
                         }
                     }
@@ -171,4 +178,49 @@ fun CameraPreviewView() {
         },
         modifier = Modifier.fillMaxSize()
     )
+}
+
+@Composable
+fun LeaderboardView(names: List<String>) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Leaderboard",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        // LazyColumn to display random names
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(names) { name ->
+                LeaderboardItem(name)
+            }
+        }
+    }
+}
+
+@Composable
+fun LeaderboardItem(name: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+            .padding(16.dp)
+    ) {
+        Text(
+            text = name,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.Black
+        )
+    }
 }
