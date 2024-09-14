@@ -3,6 +3,7 @@ package com.example.hackcmuapp
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Base64 // Correct Base64 import
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -32,6 +33,7 @@ import com.example.hackcmuapp.ui.theme.HackCMUAppTheme
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import java.io.File
+import java.io.FileInputStream
 import java.io.IOException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -175,7 +177,9 @@ class MainActivity : ComponentActivity() {
 
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     Log.d(TAG, "Photo capture succeeded: ${photoFile.absolutePath}")
-                    uploadPhoto(photoFile) { success ->
+                    val base64Image = encodeImageToBase64(photoFile)
+
+                    uploadPhoto(base64Image) { success ->
                         runOnUiThread {
                             Toast.makeText(
                                 this@MainActivity,
@@ -189,17 +193,24 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun uploadPhoto(photoFile: File, callback: (Boolean) -> Unit) {
-        // Replace with the desired URL for the post request
-        val url = "https://www.postb.in/1726289277272-7961796934250?hello=world"
+    private fun encodeImageToBase64(photoFile: File): String {
+        val inputStream = FileInputStream(photoFile)
+        val bytes = inputStream.readBytes()
+        inputStream.close()
+        return Base64.encodeToString(bytes, Base64.DEFAULT)
+    }
 
-        val requestBody = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart(
-                "file", photoFile.name,
-                RequestBody.create("image/jpeg".toMediaTypeOrNull(), photoFile)
-            )
-            .build()
+    private fun uploadPhoto(base64Image: String, callback: (Boolean) -> Unit) {
+        val url = "https://f187-128-237-82-8.ngrok-free.app/upload"
+
+        // Create JSON body for the POST request
+        val jsonBody = """
+            {
+                "image": "$base64Image"
+            }
+        """.trimIndent()
+
+        val requestBody = RequestBody.create("application/json".toMediaTypeOrNull(), jsonBody)
 
         val request = Request.Builder()
             .url(url)
