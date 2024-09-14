@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import coil.compose.rememberImagePainter
 import com.example.hackcmuapp.ui.theme.HackCMUAppTheme
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -58,7 +59,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             HackCMUAppTheme {
-                var showUploadButton by remember { mutableStateOf(false) }
+                var showCameraPreview by remember { mutableStateOf(true) }
+                var showLeaderboard by remember { mutableStateOf(false) }
                 var capturedPhotoFile by remember { mutableStateOf<File?>(null) }
 
                 Scaffold(
@@ -71,16 +73,47 @@ class MainActivity : ComponentActivity() {
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Camera Icon Button
+                                    // Left Button with Leaderboard Icon
                                     IconButton(onClick = {
-                                        takePhoto { photoFile ->
-                                            capturedPhotoFile = photoFile
-                                            showUploadButton = true
-                                        }
+                                        showLeaderboard = true
+                                        showCameraPreview = false
                                     }) {
+                                        Image(
+                                            painter = painterResource(id = R.drawable.leaderboard),
+                                            contentDescription = "Leaderboard Icon",
+                                            modifier = Modifier.size(40.dp),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    }
+
+                                    // Circular Button with Camera Icon in the center
+                                    IconButton(
+                                        onClick = {
+                                            showCameraPreview = true
+                                            showLeaderboard = false
+                                        },
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .size(60.dp)
+                                            .padding(8.dp)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                    ) {
                                         Image(
                                             painter = painterResource(id = R.drawable.camera),
                                             contentDescription = "Camera Icon",
+                                            modifier = Modifier.size(40.dp),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    }
+
+                                    // Right Button with Dog Icon
+                                    IconButton(onClick = {
+                                        showLeaderboard = false
+                                        showCameraPreview = false
+                                    }) {
+                                        Image(
+                                            painter = painterResource(id = R.drawable.dog),
+                                            contentDescription = "Dog Icon",
                                             modifier = Modifier.size(40.dp),
                                             contentScale = ContentScale.Fit
                                         )
@@ -96,22 +129,26 @@ class MainActivity : ComponentActivity() {
                             .padding(paddingValues),
                         contentAlignment = Alignment.Center
                     ) {
-                        CameraPreviewView()
-
-                        // Show Upload button after photo is taken
-                        if (showUploadButton) {
-                            Button(onClick = {
-                                capturedPhotoFile?.let { file ->
-                                    uploadPhoto(file) { success ->
-                                        Toast.makeText(
-                                            applicationContext,
-                                            if (success) "Upload successful!" else "Upload failed.",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
-                            }) {
-                                Text(text = "Upload Photo")
+                        when {
+                            showLeaderboard -> LeaderboardView()
+                            showCameraPreview -> CameraPreviewView(onPhotoCaptured = { photoFile ->
+                                capturedPhotoFile = photoFile
+                            })
+                            else -> {
+                                // Show captured photo or a default image if none was captured
+                                capturedPhotoFile?.let {
+                                    Image(
+                                        painter = rememberImagePainter(it),
+                                        contentDescription = "Captured Photo",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } ?: Image(
+                                    painter = painterResource(id = R.drawable.bg),
+                                    contentDescription = "Default Background",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
                             }
                         }
                     }
@@ -150,7 +187,7 @@ class MainActivity : ComponentActivity() {
             .setType(MultipartBody.FORM)
             .addFormDataPart(
                 "file", photoFile.name,
-                RequestBody.create("image/jpeg".toMediaTypeOrNull(), photoFile)  // Using toMediaTypeOrNull
+                RequestBody.create("image/jpeg".toMediaTypeOrNull(), photoFile)
             )
             .build()
 
@@ -172,7 +209,7 @@ class MainActivity : ComponentActivity() {
                     Log.d(TAG, "Upload successful")
                     callback(true)
                 } else {
-                    Log.e(TAG, "Upload failed with code: ${response.code}")  // Using response.code
+                    Log.e(TAG, "Upload failed with code: ${response.code}")
                     callback(false)
                 }
             }
@@ -191,7 +228,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun CameraPreviewView() {
+    fun CameraPreviewView(onPhotoCaptured: (File) -> Unit) {
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
         val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
@@ -225,6 +262,30 @@ class MainActivity : ComponentActivity() {
 
             previewView
         }, modifier = Modifier.fillMaxSize())
+
+        // Capture photo on button click
+        Button(onClick = {
+            takePhoto { photoFile ->
+                onPhotoCaptured(photoFile)
+            }
+        }) {
+            Text(text = "Take Photo")
+        }
+    }
+
+    @Composable
+    fun LeaderboardView() {
+        // Placeholder for Leaderboard content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(text = "Leaderboard", style = MaterialTheme.typography.headlineMedium)
+            // You can add actual leaderboard content here
+        }
     }
 
     companion object {
