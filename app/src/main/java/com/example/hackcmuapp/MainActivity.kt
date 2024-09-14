@@ -206,8 +206,8 @@ class MainActivity : ComponentActivity() {
                                     color = Color.Black
                                 )
                             }
+                            selectedButton == "dog" -> ProfileView() // Display the profile view when dog icon is clicked
                             else -> {
-                                // Show captured photo or a default image if none was captured
                                 capturedPhotoFile?.let {
                                     Image(
                                         painter = rememberImagePainter(it),
@@ -397,6 +397,44 @@ class MainActivity : ComponentActivity() {
         ) {
             Text(text = "Leaderboard", style = MaterialTheme.typography.headlineMedium)
             // You can add actual leaderboard content here
+        }
+    }
+
+    @Composable
+    fun ProfileView() {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Display profile image
+            Image(
+                painter = painterResource(id = R.drawable.dog),
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(100.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Display name
+            Text(
+                text = "Anurag Kapila",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Display verified status
+            Text(
+                text = "Verified",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Gray
+            )
         }
     }
 
